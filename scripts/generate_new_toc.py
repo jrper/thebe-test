@@ -16,10 +16,10 @@ def nb_title(fname):
 
     for cell in nb.cells:
         if cell.cell_type == "markdown":
-            title = re.search("# (.*?)\n", cell['source'])\
+            title = re.search("# (.*?)\n", cell['source'])
 
             if title is not None:
-                title = title.group().split("#")[-1].strip()
+                title = title.group().split("#")[-1].strip().replace('"', r'\"')
                 return title
 
 
@@ -27,16 +27,16 @@ def nb_title(fname):
 if os.path.isdir('_tmp'):
     shutil.rmtree('_tmp')
 os.mkdir('_tmp')
-shutil.copytree(os.sep.join(('notebooks','images')),
+shutil.copytree(os.sep.join(('.','images')),
                 os.sep.join(('_tmp','images')))
-skiplist= [os.sep.join(('notebooks','images')),]
+skiplist= ['images', '_tmp']
 
 def use_nested():
     return sys.platform != 'win32'
 
 def fix(path):
     if use_nested():
-        newpath = path.replace('notebooks'+os.sep, '', 1)
+        newpath = path
     else:
         newpath = '__'.join(path.split(os.sep)[1:])
     os.makedirs(os.sep.join(('_tmp', os.path.dirname(newpath))),
@@ -46,10 +46,10 @@ def fix(path):
 
 def change_path(root, base):
     if use_nested():
-        print(root.replace('notebooks', base, 1))
+        print(root.replace('.', base, 1))
         print(root.replace(root.rsplit(os.sep, 1)[0],
                             base, 1))
-        return root.replace('notebooks', base, 1)
+        return root.replace('.', base, 1)
     else:
         return root.replace(root.rsplit(os.sep, 1)[0],
                             base, 1)
@@ -68,7 +68,7 @@ url = argv_or_default(2, '')
 with open('_newconfig.yml.in', 'r') as template_file:
     template = Template(template_file.read())
 with open('_tmp'+os.sep+'_config.yml', 'w') as outfile:
-    outfile.write(template.substitute(logopath=fix(os.sep.join(("notebooks",
+    outfile.write(template.substitute(logopath=fix(os.sep.join((".",
                                                                 "images",
                                                                 "logo",
                                                                 "logo.png")))))
@@ -85,7 +85,7 @@ subsection = Template("""    - title: "${title}"
       file: ${path}
 """)
 
-leveltext = [None, chapter, section, subsection]
+leveltext = [chapter, chapter, section, subsection]
 
 
 oldlevel = 1
@@ -94,15 +94,18 @@ with open('_tmp'+os.sep+'_toc.yml', 'w') as outfile:
 
     ## scan the files in the directories
 
-    outfile.write(chapter.substitute(path=fix(os.sep.join(('notebooks',
+    outfile.write(chapter.substitute(path=fix(os.sep.join(('.',
                                                     'intro.md'))),
                                      title='Home'))
 
-    for root, dirs, files in os.walk('notebooks'):
-        if root == 'notebooks':
+    for root, dirs, files in os.walk('.'):
+        if root == '.' or root.startswith('./_tmp') or root.startswith('./.git'):
             ## Skip the base level
             continue
 
+        print(root, root.startswith('_tmp'))
+        
+        
         for dir in dirs:
             if dir.startswith('.') or not (os.path.isfile(os.sep.join((root, dir, "intro.md"))) or os.path.isfile(os.sep.join((root, dir, "intro.ipynb")))):
                 skiplist.append(os.sep.join((root, dir)))
@@ -112,11 +115,14 @@ with open('_tmp'+os.sep+'_toc.yml', 'w') as outfile:
         exts = set(os.path.splitext(file)[1] for file in files)
         if ('.ipynb' not in exts and
             '.md' not in exts):
-            shutil.copytree(root, change_path(root, '_tmp'))
-            shutil.copytree(root, change_path(root,
+            try:
+                shutil.copytree(root, change_path(root, '_tmp'))
+                shutil.copytree(root, change_path(root,
                                               os.sep.join(('_tmp',
                                                            '_build',
                                                            'html'))))
+            except:
+                pass
         title = root.split(os.sep)[-1].title().replace('_', ' ')
         if 'intro.md' in files:
             filepath = os.sep.join((root, 'intro.md'))
